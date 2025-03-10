@@ -50,54 +50,7 @@ export const mySchema = appSchema({
         { name: 'f_balance', type: 'number' }
       ],
     }),
-    tableSchema({
-      name: 't_factura_pedido',
-      columns: [
-        { name: 'f_cliente', type: 'number' },
-        { name: 'f_documento', type: 'string' },
-        { name: 'f_tipodoc', type: 'string' },
-        { name: 'f_nodoc', type: 'number' },
-        { name: 'f_fecha', type: 'string'},
-        { name: 'f_monto', type: 'number' },
-        { name: 'f_itbis', type: 'number' },
-        { name: 'f_descuento', type: 'number'},
-        { name: 'f_porc_descuento', type: 'number'},
-        { name: 'f_condicion', type: 'number' }
-      ],
-    }),
-    tableSchema({
-      name: 't_detalle_factura_pedido',
-      columns: [
-        { name: 'f_documento', type: 'string' },
-        { name: 'f_referencia', type: 'number' },
-        { name: 'f_cantidad', type: 'number' },
-        { name: 'f_precio', type: 'number' },
-      ],
-    }),
-    tableSchema({
-      name: 't_factura',
-      columns: [
-        { name: 'f_cliente', type: 'number' },
-        { name: 'f_documento', type: 'string' },
-        { name: 'f_tipodoc', type: 'string' },
-        { name: 'f_nodoc', type: 'number' },
-        { name: 'f_fecha', type: 'string'},
-        { name: 'f_fecha_vencimiento', type: 'string' },
-        { name: 'f_monto', type: 'number' },
-        { name: 'f_itbis', type: 'number' },
-        { name: 'f_descuento', type: 'number'},
-        { name: 'f_monto', type: 'number' },
-        { name: 'f_pedido', type: 'number' }
-      ],
-    }),
-    tableSchema({
-      name: 't_detalle_factura',
-      columns: [
-        { name: 'f_documento', type: 'string' },
-        { name: 'f_referencia', type: 'number' },
-        { name: 'f_cantidad', type: 'number' },
-        { name: 'f_precio', type: 'number' },
-      ],
-    }),
+   
+    
   ],
 });

@@ -8,7 +8,7 @@ import { Clientes } from './models';
 // Configurar el adaptador de SQLite con migraciones
 const adapter = new SQLiteAdapter({
   schema: mySchema,
-  //migrations, // Agrega las migraciones
+  migrations, // Agrega las migraciones
 });
 
 // Crear la base de datos
