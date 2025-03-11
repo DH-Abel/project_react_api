@@ -2,8 +2,11 @@ import { Database } from '@nozbe/watermelondb';
 import SQLiteAdapter from '@nozbe/watermelondb/adapters/sqlite';
 import { mySchema } from './schema';
 import { migrations } from './migrations';
-import { Producto } from './models';
+import { DetalleFacturaPedido, Producto } from './models';
 import { Clientes } from './models';
+import { CuentaCobrar } from './models';
+import { FacturaPedido } from './models';
+
 
 // Configurar el adaptador de SQLite con migraciones
 const adapter = new SQLiteAdapter({
@@ -14,5 +17,5 @@ const adapter = new SQLiteAdapter({
 // Crear la base de datos
 export const database = new Database({
   adapter,
-  modelClasses: [Producto, Clientes],
+  modelClasses: [Producto, Clientes, CuentaCobrar, FacturaPedido, DetalleFacturaPedido],
 });

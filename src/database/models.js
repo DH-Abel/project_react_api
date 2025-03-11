@@ -45,5 +45,26 @@ export class CuentaCobrar extends Model {
   @field('f_monto') f_monto;
   @field('f_balance') f_balance;
 }
+export class FacturaPedido extends Model {
+  static table = 't_factura_pedido';
+  @field('f_cliente') f_cliente;
+  @text('f_documento') f_documento;
+  @text('f_tipodoc') f_tipodoc;
+  @field('f_nodoc') f_nodoc;
+  @text('f_fecha') f_fecha;  
+  @field('f_monto') f_monto;  
+  @field('f_itbis') f_itbis;
+  @field('f_descuento') f_descuento;
+  @field('f_porc_descuento') f_porc_descuento;
+  @field('f_condicion') f_condicion;
+}
+
+export class DetalleFacturaPedido extends Model {
+  static table = 't_detalle_factura_pedido';
+  @field('f_documento') f_documento;
+  @field('f_referencia') f_referencia;
+  @field('f_cantidad') f_cantidad;
+  @field('f_precio') f_precio;
+}
 
 

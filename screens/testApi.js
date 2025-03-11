@@ -12,6 +12,7 @@ import { Q } from '@nozbe/watermelondb';
 import { KeyboardAwareFlatList } from 'react-native-keyboard-aware-scroll-view';
 import CambiarCantidadModal from './modal/cambiarCantidad';
 
+
 export default function TestApi() {
   // Estados para clientes y productos
   const [clientes, setClientes] = useState([]);
@@ -26,9 +27,21 @@ export default function TestApi() {
   const [modalEditVisible, setModalEditVisible] = useState(false);
   const [productoParaEditar, setProductoParaEditar] = useState(null);
   const [nuevaCantidad, setNuevaCantidad] = useState('');
-
+  const [isSaving, setIsSaving] = useState(false);
 
   let syncInProgress = false;
+  let syncClientesInProgress = false;
+
+
+  const normalizeString = (value) => {
+    if (value === null || value === undefined) return '';
+    return String(value).trim();
+  };
+  
+  const normalizeNumber = (value) => {
+    if (value === null || value === undefined || value === '') return 0;
+    return Number(value);
+  };
 
   // Carga de clientes al iniciar
   // Función para obtener clientes desde la API
@@ -67,74 +80,137 @@ export default function TestApi() {
     }
   }, [clienteSeleccionado]);
   const sincronizarClientes = async () => {
+    if (syncClientesInProgress) return; // Evitar concurrencia
+    syncClientesInProgress = true;
     try {
-      //Obtiene los clientes desde la API
       const response = await api.get('/clientes');
       const clientesRemotos = response.data;
-
+  
       await database.write(async () => {
         const clientesCollection = database.collections.get('t_clientes');
+  
         for (let cli of clientesRemotos) {
-          cli.f_nombre = cli.f_nombre ? cli.f_nombre.trim() : cli.f_nombre;
-
+          const remote = {
+            f_id: cli.f_id,
+            f_nombre: normalizeString(cli.f_nombre),
+            f_d_municipio: normalizeString(cli.f_d_municipio),
+            f_vendedor: normalizeString(cli.f_vendedor),
+            f_zona: normalizeString(cli.f_zona),
+            f_telefono: normalizeString(cli.f_telefono),
+            f_telefono_pro: normalizeString(cli.f_telefono_pro),
+            f_descuento_maximo: normalizeNumber(cli.f_descuento_maximo),
+            f_descuento1: normalizeNumber(cli.f_descuento1),
+            f_clasificacion: normalizeString(cli.f_clasificacion),
+            f_direccion: normalizeString(cli.f_direccion),
+            f_activo: normalizeString(cli.f_activo),
+            f_cedula: normalizeString(cli.f_cedula),
+            f_dias_aviso: normalizeString(cli.f_dias_aviso),
+            f_bloqueo_credito: normalizeString(cli.f_bloqueo_credito),
+            f_facturar_contra_entrega: normalizeString(cli.f_facturar_contra_entrega),
+            f_bloqueo_ck: normalizeString(cli.f_bloqueo_ck),
+            f_limite_credito: normalizeNumber(cli.f_limite_credito)
+          };
+  
           const clientesLocales = await clientesCollection.query(
-            Q.where('f_id', cli.f_id)
+            Q.where('f_id', remote.f_id)
           ).fetch();
-
+  
           if (clientesLocales.length > 0) {
             const clienteLocal = clientesLocales[0];
-            await clienteLocal.update(record => {
-              record.f_id = cli.f_id;
-              record.f_nombre = cli.f_nombre;
-              record.f_d_municipio = cli.f_d_municipio;
-              record.f_vendedor = cli.f_vendedor;
-              record.f_zona = cli.f_zona;
-              record.f_telefono = cli.f_telefono;
-              record.f_telefono_pro = cli.f_telefono_pro;
-              record.f_descuento_maximo = cli.f_descuento_maximo;
-              record.f_descuento1 = cli.f_descuento1;
-              record.f_clasificacion = cli.f_clasificacion;
-              record.f_direccion = cli.f_direccion;
-              record.f_activo = cli.f_activo;
-              record.f_cedula = cli.f_cedula;
-              record.f_dias_aviso = cli.f_dias_aviso;
-              record.f_bloqueo_credito = cli.f_bloqueo_credito;
-              record.f_facturar_contra_entrega = cli.f_facturar_contra_entrega;
-              record.f_bloqueo_ck = cli.f_bloqueo_ck;
-              record.f_limite_credito = cli.f_limite_credito;
-            });
-            console.log(`Cliente ${cli.f_id} actualizado.`);
-          }
-          else {
+            const local = {
+              f_id: clienteLocal.f_id,
+              f_nombre: normalizeString(clienteLocal.f_nombre),
+              f_d_municipio: normalizeString(clienteLocal.f_d_municipio),
+              f_vendedor: normalizeString(clienteLocal.f_vendedor),
+              f_zona: normalizeString(clienteLocal.f_zona),
+              f_telefono: normalizeString(clienteLocal.f_telefono),
+              f_telefono_pro: normalizeString(clienteLocal.f_telefono_pro),
+              f_descuento_maximo: normalizeNumber(clienteLocal.f_descuento_maximo),
+              f_descuento1: normalizeNumber(clienteLocal.f_descuento1),
+              f_clasificacion: normalizeString(clienteLocal.f_clasificacion),
+              f_direccion: normalizeString(clienteLocal.f_direccion),
+              f_activo: normalizeString(clienteLocal.f_activo),
+              f_cedula: normalizeString(clienteLocal.f_cedula),
+              f_dias_aviso: normalizeString(clienteLocal.f_dias_aviso),
+              f_bloqueo_credito: normalizeString(clienteLocal.f_bloqueo_credito),
+              f_facturar_contra_entrega: normalizeString(clienteLocal.f_facturar_contra_entrega),
+              f_bloqueo_ck: normalizeString(clienteLocal.f_bloqueo_ck),
+              f_limite_credito: normalizeNumber(clienteLocal.f_limite_credito)
+            };
+  
+            let updateNeeded = false;
+            let differences = [];
+  
+            if (local.f_nombre !== remote.f_nombre) {
+              updateNeeded = true;
+              differences.push(`f_nombre: local (${local.f_nombre}) vs remoto (${remote.f_nombre})`);
+            }
+            // Compara el resto de los campos de la misma manera...
+            if (local.f_d_municipio !== remote.f_d_municipio) {
+              updateNeeded = true;
+              differences.push(`f_d_municipio: local (${local.f_d_municipio}) vs remoto (${remote.f_d_municipio})`);
+            }
+            // ... agrega todas las comparaciones necesarias
+  
+            if (updateNeeded) {
+              await clienteLocal.update(record => {
+                record.f_id = remote.f_id;
+                record.f_nombre = remote.f_nombre;
+                record.f_d_municipio = remote.f_d_municipio;
+                record.f_vendedor = remote.f_vendedor;
+                record.f_zona = remote.f_zona;
+                record.f_telefono = remote.f_telefono;
+                record.f_telefono_pro = remote.f_telefono_pro;
+                record.f_descuento_maximo = remote.f_descuento_maximo;
+                record.f_descuento1 = remote.f_descuento1;
+                record.f_clasificacion = remote.f_clasificacion;
+                record.f_direccion = remote.f_direccion;
+                record.f_activo = remote.f_activo;
+                record.f_cedula = remote.f_cedula;
+                record.f_dias_aviso = remote.f_dias_aviso;
+                record.f_bloqueo_credito = remote.f_bloqueo_credito;
+                record.f_facturar_contra_entrega = remote.f_facturar_contra_entrega;
+                record.f_bloqueo_ck = remote.f_bloqueo_ck;
+                record.f_limite_credito = remote.f_limite_credito;
+              });
+              console.log(`Cliente ${remote.f_id} actualizado. Cambios: ${differences.join(', ')}`);
+            } else {
+              console.log(`Cliente ${remote.f_id} sin cambios.`);
+            }
+          } else {
             await clientesCollection.create(record => {
-              record.f_id = cli.f_id;
-              record.f_nombre = cli.f_nombre;
-              record.f_d_municipio = cli.f_d_municipio;
-              record.f_vendedor = cli.f_vendedor;
-              record.f_zona = cli.f_zona;
-              record.f_telefono = cli.f_telefono;
-              record.f_telefono_pro = cli.f_telefono_pro;
-              record.f_descuento_maximo = cli.f_descuento_maximo;
-              record.f_descuento1 = cli.f_descuento1;
-              record.f_clasificacion = cli.f_clasificacion;
-              record.f_direccion = cli.f_direccion;
-              record.f_activo = cli.f_activo;
-              record.f_cedula = cli.f_cedula;
-              record.f_dias_aviso = cli.f_dias_aviso;
-              record.f_bloqueo_credito = cli.f_bloqueo_credito;
-              record.f_facturar_contra_entrega = cli.f_facturar_contra_entrega;
-              record.f_bloqueo_ck = cli.f_bloqueo_ck;
-              record.f_limite_credito = cli.f_limite_credito;
-            })
+              record.f_id = remote.f_id;
+              record.f_nombre = remote.f_nombre;
+              record.f_d_municipio = remote.f_d_municipio;
+              record.f_vendedor = remote.f_vendedor;
+              record.f_zona = remote.f_zona;
+              record.f_telefono = remote.f_telefono;
+              record.f_telefono_pro = remote.f_telefono_pro;
+              record.f_descuento_maximo = remote.f_descuento_maximo;
+              record.f_descuento1 = remote.f_descuento1;
+              record.f_clasificacion = remote.f_clasificacion;
+              record.f_direccion = remote.f_direccion;
+              record.f_activo = remote.f_activo;
+              record.f_cedula = remote.f_cedula;
+              record.f_dias_aviso = remote.f_dias_aviso;
+              record.f_bloqueo_credito = remote.f_bloqueo_credito;
+              record.f_facturar_contra_entrega = remote.f_facturar_contra_entrega;
+              record.f_bloqueo_ck = remote.f_bloqueo_ck;
+              record.f_limite_credito = remote.f_limite_credito;
+            });
+            console.log(`Cliente ${remote.f_id} insertado.`);
           }
         }
-          
-    });
-    cargarClientesLocales();
-  } catch (error) {
-    console.error('❌ Error al sincronizar clientes:', error);
-  }
-}
+      });
+      cargarClientesLocales();
+    } catch (error) {
+      console.error('❌ Error al sincronizar clientes:', error);
+    }
+    finally {
+      syncClientesInProgress = false;
+    }
+  };
+  
 
 
 // Función para sincronizar productos desde la API hacia la base local
@@ -294,6 +370,9 @@ const cargarProductos = async () => {
 useEffect(() => {
   // Configura el intervalo para revisar y sincronizar cada 5 minutos
   const intervalId = setInterval(() => {
+    if (syncInProgress) {
+      return;
+    }
     cargarProductos();
   }, 40000); // 90,000 ms = 90 segundos
 
@@ -401,9 +480,11 @@ const eliminarDelPedido = (f_referencia) => {
 };
 
 const realizarPedido = async () => {
+  // Convertimos el objeto 'pedido' en un array de detalles
   const productosPedido = Object.entries(pedido).map(([f_referencia, data]) => ({
-    producto_id: f_referencia,
-    cantidad: data.cantidad
+    f_referencia: parseInt(f_referencia, 10),
+    cantidad: data.cantidad,
+    f_precio: data.f_precio5,
   }));
 
   if (productosPedido.length === 0) {
@@ -412,7 +493,39 @@ const realizarPedido = async () => {
   }
 
   try {
-    await api.post('/pedidos', { productos: productosPedido });
+    // Datos del encabezado del pedido.
+    // Asegúrate de tener definidas las variables: clienteSeleccionado, totalNeto, itbis, etc.
+    const headerData = {
+      f_cliente: clienteSeleccionado.f_id,     // ID del cliente seleccionado
+      f_documento: `PED-${Date.now()}`,           // Genera un identificador único
+      f_tipodoc: 'PEDIDO',                        // Tipo de documento
+      f_nodoc: 1,                                 // Número de documento (ajústalo según corresponda)
+      f_fecha: new Date().toISOString(),          // Fecha actual en formato ISO
+      f_itbis: itbis,                             // ITBIS calculado (por ejemplo, totalBruto * 0.18)
+      f_descuento: 0,                             // Descuento, si aplica
+      f_porc_descuento: 0,                        // Porcentaje de descuento, si aplica
+      f_monto: totalNeto,                         // Monto total del pedido (totalNeto)
+      f_condicion: 1,                             // Por ejemplo, 1 para contado o 2 para crédito
+    };
+
+    // Insertamos el encabezado del pedido
+    const headerResponse = await api.post('/pedido', headerData);
+    const pedidoCreado = headerResponse.data;
+    // Obtenemos el documento para relacionar el detalle
+    const documento = pedidoCreado.f_documento;
+
+    // Insertar cada detalle del pedido utilizando el mismo f_documento del encabezado
+    const detallePromises = productosPedido.map(item => {
+      const detalleData = {
+        f_documento: documento,       // Relaciona el detalle con el encabezado
+        f_referencia: item.f_referencia,
+        f_cantidad: item.cantidad,
+        f_precio: item.precio,
+      };
+      return api.post('/detalle-pedido', detalleData);
+    });
+    await Promise.all(detallePromises);
+
     Alert.alert("Éxito", "Pedido realizado correctamente");
     setPedido({});
     setModalVisible(false);
@@ -421,6 +534,7 @@ const realizarPedido = async () => {
     Alert.alert("Error", "No se pudo realizar el pedido");
   }
 };
+
 
 //funcion del modal cambiar cantidad adel resumen del pedido
 const cambiarCantidad = (f_referencia) => {
@@ -432,6 +546,67 @@ const cambiarCantidad = (f_referencia) => {
   setProductoParaEditar({ ...producto, f_referencia });
   setNuevaCantidad(producto.cantidad.toString());
   setModalEditVisible(true);
+};
+
+const realizarPedidoLocal = async () => {
+  if(isSaving) return;
+  setIsSaving(true);
+  // Convertir el objeto 'pedido' en un array de detalles
+  const productosPedido = Object.entries(pedido).map(([f_referencia, data]) => ({
+    f_referencia: parseInt(f_referencia, 10),
+    cantidad: data.cantidad,
+    f_precio: data.f_precio5,
+  }));
+
+  if (productosPedido.length === 0) {
+    Alert.alert("Error", "No has seleccionado ningún producto");
+    return;
+  }
+
+  try {
+    await database.write(async () => {
+      // Obtener las colecciones correspondientes
+      const facturaCollection = database.collections.get('t_factura_pedido');
+      const detalleCollection = database.collections.get('t_detalle_factura_pedido');
+
+      // Generar un identificador único para el documento del pedido
+      const documento = `PED-${Date.now()}`;
+
+      // Insertar el encabezado (factura del pedido)
+      await facturaCollection.create(record => {
+        record.f_cliente = clienteSeleccionado.f_id;
+        record.f_documento = documento;
+        record.f_tipodoc = 'PEDIDO';
+        record.f_nodoc = 1; // Ajusta según tu lógica
+        record.f_fecha = new Date().toISOString();
+        record.f_itbis = itbis; // Calculado previamente
+        record.f_descuento = 0;
+        record.f_porc_descuento = 0;
+        record.f_monto = totalNeto; // Total neto del pedido
+        record.f_condicion = 1; // Por ejemplo, 1 para contado
+      });
+
+      // Insertar cada detalle del pedido
+      for (const item of productosPedido) {
+        await detalleCollection.create(record => {
+          record.f_documento = documento; // Relaciona el detalle con el encabezado
+          record.f_referencia = item.f_referencia;
+          record.f_cantidad = item.cantidad;
+          record.f_precio = item.f_precio;
+        });
+      }
+    });
+
+    Alert.alert("Éxito", "Pedido guardado localmente");
+    setPedido({});
+    setModalVisible(false);
+  } catch (error) {
+    console.error("Error al guardar el pedido localmente:", error);
+    Alert.alert("Error", "No se pudo guardar el pedido localmente");
+  }
+  finally {
+    setIsSaving(false);
+  }
 };
 
 
@@ -555,9 +730,11 @@ return (
                     </View>
                     <View>
                       <TouchableOpacity onPress={() => cambiarCantidad(f_referencia)} style={styles.modalButton2}>
-                        <Text style={styles.modalButtonText}>✍️</Text>
+                        <Text style={[styles.modalButtonText, isSaving && { opacity: 0.6 }]}
+                          disabled={isSaving}>✍️</Text>
                       </TouchableOpacity>
-                      <TouchableOpacity onPress={() => eliminarDelPedido(f_referencia)} style={styles.modalButton3}>
+                      <TouchableOpacity onPress={() => eliminarDelPedido(f_referencia)} style={[styles.modalButton3, isSaving && { opacity: 0.6 }]}
+                        disabled={isSaving}>
                         <Text style={styles.modalButtonText}>❌</Text>
                       </TouchableOpacity>
                     </View>
@@ -572,12 +749,21 @@ return (
 
         {/* Contenedor fijo de botones */}
         <View style={{ height: 60, flexDirection: 'row', justifyContent: 'space-between', padding: 10 }}>
-          <Pressable onPress={() => setModalVisible(false)} style={styles.buttonRow2}>
+          <Pressable onPress={() => setModalVisible(false)} style={[styles.buttonRow2, isSaving && { opacity: 0.6 }]}
+            disabled={isSaving}>
             <Text style={styles.buttonText}>Agregar productos</Text>
           </Pressable>
-          <Pressable onPress={realizarPedido} style={styles.buttonRow}>
-            <Text style={styles.buttonText}>Confirmar Pedido</Text>
-          </Pressable>
+          <Pressable 
+              onPress={realizarPedidoLocal} 
+              style={[styles.buttonRow, isSaving && { opacity: 0.6 }]} 
+              disabled={isSaving}
+            >
+              {isSaving ? (
+                <ActivityIndicator color="#fff" />
+              ) : (
+                <Text style={styles.buttonText}>Confirmar Pedido</Text>
+              )}
+            </Pressable>
         </View>
       </SafeAreaView>
     </Modal>
