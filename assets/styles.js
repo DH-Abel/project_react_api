@@ -57,6 +57,9 @@ export const styles = StyleSheet.create({
         gap: 8,
         marginBottom: 8,
       },
+      step: {
+        padding: 5,
+      },
       container: {
         flex: 1,
         paddingTop: 10,

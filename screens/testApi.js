@@ -479,63 +479,6 @@ const eliminarDelPedido = (f_referencia) => {
   });
 };
 
-const realizarPedido = async () => {
-  // Convertimos el objeto 'pedido' en un array de detalles
-  const productosPedido = Object.entries(pedido).map(([f_referencia, data]) => ({
-    f_referencia: parseInt(f_referencia, 10),
-    cantidad: data.cantidad,
-    f_precio: data.f_precio5,
-  }));
-
-  if (productosPedido.length === 0) {
-    Alert.alert("Error", "No has seleccionado ningún producto");
-    return;
-  }
-
-  try {
-    // Datos del encabezado del pedido.
-    // Asegúrate de tener definidas las variables: clienteSeleccionado, totalNeto, itbis, etc.
-    const headerData = {
-      f_cliente: clienteSeleccionado.f_id,     // ID del cliente seleccionado
-      f_documento: `PED-${Date.now()}`,           // Genera un identificador único
-      f_tipodoc: 'PEDIDO',                        // Tipo de documento
-      f_nodoc: 1,                                 // Número de documento (ajústalo según corresponda)
-      f_fecha: new Date().toISOString(),          // Fecha actual en formato ISO
-      f_itbis: itbis,                             // ITBIS calculado (por ejemplo, totalBruto * 0.18)
-      f_descuento: 0,                             // Descuento, si aplica
-      f_porc_descuento: 0,                        // Porcentaje de descuento, si aplica
-      f_monto: totalNeto,                         // Monto total del pedido (totalNeto)
-      f_condicion: 1,                             // Por ejemplo, 1 para contado o 2 para crédito
-    };
-
-    // Insertamos el encabezado del pedido
-    const headerResponse = await api.post('/pedido', headerData);
-    const pedidoCreado = headerResponse.data;
-    // Obtenemos el documento para relacionar el detalle
-    const documento = pedidoCreado.f_documento;
-
-    // Insertar cada detalle del pedido utilizando el mismo f_documento del encabezado
-    const detallePromises = productosPedido.map(item => {
-      const detalleData = {
-        f_documento: documento,       // Relaciona el detalle con el encabezado
-        f_referencia: item.f_referencia,
-        f_cantidad: item.cantidad,
-        f_precio: item.precio,
-      };
-      return api.post('/detalle-pedido', detalleData);
-    });
-    await Promise.all(detallePromises);
-
-    Alert.alert("Éxito", "Pedido realizado correctamente");
-    setPedido({});
-    setModalVisible(false);
-  } catch (error) {
-    console.error("❌ Error al realizar el pedido:", error);
-    Alert.alert("Error", "No se pudo realizar el pedido");
-  }
-};
-
-
 //funcion del modal cambiar cantidad adel resumen del pedido
 const cambiarCantidad = (f_referencia) => {
   const producto = pedido[f_referencia];
@@ -570,13 +513,13 @@ const realizarPedidoLocal = async () => {
       const detalleCollection = database.collections.get('t_detalle_factura_pedido');
 
       // Generar un identificador único para el documento del pedido
-      const documento = `PED-${Date.now()}`;
+      const documento = `PEDO-${Date.now()}`;
 
       // Insertar el encabezado (factura del pedido)
       await facturaCollection.create(record => {
         record.f_cliente = clienteSeleccionado.f_id;
         record.f_documento = documento;
-        record.f_tipodoc = 'PEDIDO';
+        record.f_tipodoc = 'PEDO';
         record.f_nodoc = 1; // Ajusta según tu lógica
         record.f_fecha = new Date().toISOString();
         record.f_itbis = itbis; // Calculado previamente

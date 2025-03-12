@@ -5,6 +5,7 @@ import { SafeAreaView, Text } from "react-native";
 import React from "react";
 import ConsultaPedidos from "../consultaPedido";
 import TestApi from "../testApi";
+import DetallesPedido from "../detallePedido";
 import { View } from "react-native";
 import { enableScreens } from 'react-native-screens';
 enableScreens();
@@ -19,6 +20,8 @@ export default function MyStack() {
             <Stack.Navigator>
                 <Stack.Screen name="ConsultaPedidos" component={ConsultaPedidos} />
                 <Stack.Screen name="TestApi" component={TestApi} />
+                <Stack.Screen name="DetallesPedido" component={DetallesPedido} />
+
             </Stack.Navigator>
         </NavigationContainer>
     );
