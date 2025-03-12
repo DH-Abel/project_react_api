@@ -409,7 +409,7 @@ export default function TestApi() {
     }
   }, [clienteSeleccionado]);
 
-  
+
   useEffect(() => {
     if (clienteSeleccionado && clienteSeleccionado.f_termino !== undefined) {
       const defaultCondicion = condicionPedido.find(
@@ -580,14 +580,14 @@ export default function TestApi() {
 
   const descuento = () => {
     if (clienteSeleccionado && condicionSeleccionada) {
-      return condicionSeleccionada.id === 0
-        ? clienteSeleccionado.f_descuento_maximo / 100
-        : clienteSeleccionado.f_descuento1 / 100;
+      return condicionSeleccionada.id === 0 
+        ? clienteSeleccionado.f_descuento_maximo
+        : clienteSeleccionado.f_descuento1;
     }
     return 0; // En caso de que clienteSeleccionado o condicionSeleccionada sean null
   };
 
-
+  const descuentoGlobal = descuento();
   const descuentoAplicado = descuento() * totalBruto;
   const itbis = Number(totalBruto - descuentoAplicado) * 0.18;
   const totalNeto = Number(totalBruto) + Number(itbis) - Number(descuentoAplicado);
@@ -646,7 +646,7 @@ export default function TestApi() {
             <Text style={styles.headerText}>Limite de credito: {formatear(clienteSeleccionado.f_limite_credito)}</Text>
             <Text style={styles.headerText}>Balance: {formatear(balanceCliente)}</Text>
             <Text style={styles.headerText}>Disponible: {formatear(creditoDisponible)}</Text>
-            <Text style={styles.headerText}>Descuento: {(clienteSeleccionado.f_descuento1)} Descuento Global: {descuento}</Text>
+            <Text style={styles.headerText}>Descuento: {(clienteSeleccionado.f_descuento1)} Descuento Global: {descuentoGlobal} Descuento contado: {clienteSeleccionado.f_descuento_maximo}</Text>
             <Text style={styles.title}>Total del pedido: {formatear(totalNeto)}</Text>
           </View>
           <View style={{ flex: 1 }}>
