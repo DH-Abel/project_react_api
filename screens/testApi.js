@@ -11,6 +11,8 @@ import { styles } from '../assets/styles';
 import { Q } from '@nozbe/watermelondb';
 import { KeyboardAwareFlatList } from 'react-native-keyboard-aware-scroll-view';
 import CambiarCantidadModal from './modal/cambiarCantidad';
+import { formatear } from '../assets/formatear';
+import ModalOptions from './modal/condicionPedido';
 
 
 export default function TestApi() {
@@ -28,6 +30,8 @@ export default function TestApi() {
   const [productoParaEditar, setProductoParaEditar] = useState(null);
   const [nuevaCantidad, setNuevaCantidad] = useState('');
   const [isSaving, setIsSaving] = useState(false);
+  const [modalVisibleCondicion, setModalVisibleCondicion] = useState(false);
+  const [condicionSeleccionada, setCondicionSeleccionada] = useState(null);
 
   let syncInProgress = false;
   let syncClientesInProgress = false;
@@ -37,7 +41,7 @@ export default function TestApi() {
     if (value === null || value === undefined) return '';
     return String(value).trim();
   };
-  
+
   const normalizeNumber = (value) => {
     if (value === null || value === undefined || value === '') return 0;
     return Number(value);
@@ -85,10 +89,10 @@ export default function TestApi() {
     try {
       const response = await api.get('/clientes');
       const clientesRemotos = response.data;
-  
+
       await database.write(async () => {
         const clientesCollection = database.collections.get('t_clientes');
-  
+
         for (let cli of clientesRemotos) {
           const remote = {
             f_id: cli.f_id,
@@ -108,13 +112,14 @@ export default function TestApi() {
             f_bloqueo_credito: normalizeString(cli.f_bloqueo_credito),
             f_facturar_contra_entrega: normalizeString(cli.f_facturar_contra_entrega),
             f_bloqueo_ck: normalizeString(cli.f_bloqueo_ck),
-            f_limite_credito: normalizeNumber(cli.f_limite_credito)
+            f_limite_credito: normalizeNumber(cli.f_limite_credito),
+            f_termino: normalizeNumber(cli.f_termino)
           };
-  
+
           const clientesLocales = await clientesCollection.query(
             Q.where('f_id', remote.f_id)
           ).fetch();
-  
+
           if (clientesLocales.length > 0) {
             const clienteLocal = clientesLocales[0];
             const local = {
@@ -135,12 +140,13 @@ export default function TestApi() {
               f_bloqueo_credito: normalizeString(clienteLocal.f_bloqueo_credito),
               f_facturar_contra_entrega: normalizeString(clienteLocal.f_facturar_contra_entrega),
               f_bloqueo_ck: normalizeString(clienteLocal.f_bloqueo_ck),
-              f_limite_credito: normalizeNumber(clienteLocal.f_limite_credito)
+              f_limite_credito: normalizeNumber(clienteLocal.f_limite_credito),
+              f_termino: (clienteLocal.f_termino)
             };
-  
+
             let updateNeeded = false;
             let differences = [];
-  
+
             if (local.f_nombre !== remote.f_nombre) {
               updateNeeded = true;
               differences.push(`f_nombre: local (${local.f_nombre}) vs remoto (${remote.f_nombre})`);
@@ -151,7 +157,7 @@ export default function TestApi() {
               differences.push(`f_d_municipio: local (${local.f_d_municipio}) vs remoto (${remote.f_d_municipio})`);
             }
             // ... agrega todas las comparaciones necesarias
-  
+
             if (updateNeeded) {
               await clienteLocal.update(record => {
                 record.f_id = remote.f_id;
@@ -172,6 +178,7 @@ export default function TestApi() {
                 record.f_facturar_contra_entrega = remote.f_facturar_contra_entrega;
                 record.f_bloqueo_ck = remote.f_bloqueo_ck;
                 record.f_limite_credito = remote.f_limite_credito;
+                record.f_termino = remote.f_termino;
               });
               console.log(`Cliente ${remote.f_id} actualizado. Cambios: ${differences.join(', ')}`);
             } else {
@@ -197,6 +204,7 @@ export default function TestApi() {
               record.f_facturar_contra_entrega = remote.f_facturar_contra_entrega;
               record.f_bloqueo_ck = remote.f_bloqueo_ck;
               record.f_limite_credito = remote.f_limite_credito;
+              record.f_termino = remote.f_termino;
             });
             console.log(`Cliente ${remote.f_id} insertado.`);
           }
@@ -210,495 +218,572 @@ export default function TestApi() {
       syncClientesInProgress = false;
     }
   };
-  
 
 
-// Función para sincronizar productos desde la API hacia la base local
 
-const sincronizarProductos = async () => {
-  if (syncInProgress) return; // Evitar operaciones concurrentes
-  syncInProgress = true;
-  try {
-    // Obtén los productos desde la API
-    const response = await api.get('/productos');
-    const productosRemotos = response.data;
+  // Función para sincronizar productos desde la API hacia la base local
 
-    await database.write(async () => {
-      const productosCollection = database.collections.get('t_productos_sucursal');
+  const sincronizarProductos = async () => {
+    if (syncInProgress) return; // Evitar operaciones concurrentes
+    syncInProgress = true;
+    try {
+      // Obtén los productos desde la API
+      const response = await api.get('/productos');
+      const productosRemotos = response.data;
 
-      for (let prod of productosRemotos) {
-        //formatea todo, para quitarle espacios delante y detras con TRIM
-        prod.f_descripcion = prod.f_descripcion ? prod.f_descripcion.trim() : prod.f_descripcion;
-        prod.f_referencia_suplidor = prod.f_referencia_suplidor ? prod.f_referencia_suplidor.trim() : prod.f_referencia_suplidor;
+      await database.write(async () => {
+        const productosCollection = database.collections.get('t_productos_sucursal');
 
-        // Busca el producto local por su referencia (suponiendo que es un identificador único)
-        const productosLocales = await productosCollection.query(
-          Q.where('f_referencia', parseInt(prod.f_referencia, 10))
-        ).fetch();
+        for (let prod of productosRemotos) {
+          //formatea todo, para quitarle espacios delante y detras con TRIM
+          prod.f_descripcion = prod.f_descripcion ? prod.f_descripcion.trim() : prod.f_descripcion;
+          prod.f_referencia_suplidor = prod.f_referencia_suplidor ? prod.f_referencia_suplidor.trim() : prod.f_referencia_suplidor;
 
-        if (productosLocales.length > 0) {
-          // Producto ya existe, actualizar si alguno de los campos difiere
-          const roundToTwo = (num) => Math.round(num * 100) / 100;
+          // Busca el producto local por su referencia (suponiendo que es un identificador único)
+          const productosLocales = await productosCollection.query(
+            Q.where('f_referencia', parseInt(prod.f_referencia, 10))
+          ).fetch();
 
-          const productoLocal = productosLocales[0];
-          const existenciaRemota = roundToTwo(parseFloat(prod.f_existencia));
-          const existenciaLocal = roundToTwo(productoLocal.f_existencia);
-          const precioRemoto = roundToTwo(parseFloat(prod.f_precio5));
-          const referenciaRemota = parseInt(prod.f_referencia, 10);
+          if (productosLocales.length > 0) {
+            // Producto ya existe, actualizar si alguno de los campos difiere
+            const roundToTwo = (num) => Math.round(num * 100) / 100;
 
-          let updateNeeded = false;
-          let differences = [];
-          if (Math.abs(existenciaLocal - existenciaRemota) > 0.001) {
-            updateNeeded = true;
-            differences.push(`existencia: local ""(${existenciaLocal})"" vs remoto ""(${existenciaRemota})""`);
-          }
-          if (productoLocal.f_descripcion !== prod.f_descripcion) {
-            updateNeeded = true;
-            differences.push(`descripción: local """${productoLocal.f_descripcion}""" vs remoto "" "${prod.f_descripcion}" ""`);
-          }
-          if (Math.abs(roundToTwo(productoLocal.f_precio5) - precioRemoto) > 0.001) {
-            updateNeeded = true;
-            differences.push(`precio5: local ""${productoLocal.f_precio5}"" vs remoto ""${precioRemoto}""`);
-          }
-          if (productoLocal.f_referencia !== referenciaRemota) {
-            updateNeeded = true;
-            differences.push(`referencia: local ""(${productoLocal.f_referencia})"" vs remoto ""(${referenciaRemota})""`);
-          }
-          if (productoLocal.f_referencia_suplidor !== prod.f_referencia_suplidor) {
-            updateNeeded = true;
-            differences.push(`referencia_suplidor: local " "${productoLocal.f_referencia_suplidor}" " vs remoto ""(${prod.f_referencia_suplidor})""`);
-          }
+            const productoLocal = productosLocales[0];
+            const existenciaRemota = roundToTwo(parseFloat(prod.f_existencia));
+            const existenciaLocal = roundToTwo(productoLocal.f_existencia);
+            const precioRemoto = roundToTwo(parseFloat(prod.f_precio5));
+            const referenciaRemota = parseInt(prod.f_referencia, 10);
 
-          if (updateNeeded) {
-            await productoLocal.update(record => {
-              record.f_existencia = existenciaRemota;
-              record.f_descripcion = prod.f_descripcion;
-              record.f_precio5 = precioRemoto;
-              record.f_referencia = referenciaRemota;
+            let updateNeeded = false;
+            let differences = [];
+            if (Math.abs(existenciaLocal - existenciaRemota) > 0.001) {
+              updateNeeded = true;
+              differences.push(`existencia: local ""(${existenciaLocal})"" vs remoto ""(${existenciaRemota})""`);
+            }
+            if (productoLocal.f_descripcion !== prod.f_descripcion) {
+              updateNeeded = true;
+              differences.push(`descripción: local """${productoLocal.f_descripcion}""" vs remoto "" "${prod.f_descripcion}" ""`);
+            }
+            if (Math.abs(roundToTwo(productoLocal.f_precio5) - precioRemoto) > 0.001) {
+              updateNeeded = true;
+              differences.push(`precio5: local ""${productoLocal.f_precio5}"" vs remoto ""${precioRemoto}""`);
+            }
+            if (productoLocal.f_referencia !== referenciaRemota) {
+              updateNeeded = true;
+              differences.push(`referencia: local ""(${productoLocal.f_referencia})"" vs remoto ""(${referenciaRemota})""`);
+            }
+            if (productoLocal.f_referencia_suplidor !== prod.f_referencia_suplidor) {
+              updateNeeded = true;
+              differences.push(`referencia_suplidor: local " "${productoLocal.f_referencia_suplidor}" " vs remoto ""(${prod.f_referencia_suplidor})""`);
+            }
+
+            if (updateNeeded) {
+              await productoLocal.update(record => {
+                record.f_existencia = existenciaRemota;
+                record.f_descripcion = prod.f_descripcion;
+                record.f_precio5 = precioRemoto;
+                record.f_referencia = referenciaRemota;
+                record.f_referencia_suplidor = prod.f_referencia_suplidor;
+              });
+              console.log(`Producto ${productoLocal.f_referencia} actualizado. Cambios: ${differences.join(', ')}`);
+            }
+
+            //comparar existencia local con existencia remota
+            // console.log('Comparación - Existencia local:', existenciaLocal, 'Existencia remota:', existenciaRemota);
+            // Verifica si alguno de los campos es diferente
+            if (
+              Math.abs(existenciaLocal - existenciaRemota) > 0.001 ||
+              productoLocal.f_descripcion !== prod.f_descripcion ||
+              Math.abs(roundToTwo(productoLocal.f_precio5) - precioRemoto) > 0.001 ||
+              productoLocal.f_referencia !== referenciaRemota ||
+              productoLocal.f_referencia_suplidor !== prod.f_referencia_suplidor
+            ) {
+              await productoLocal.update(record => {
+                record.f_existencia = existenciaRemota;
+                record.f_descripcion = prod.f_descripcion;
+                record.f_precio5 = precioRemoto;
+                record.f_referencia = referenciaRemota;
+                record.f_referencia_suplidor = prod.f_referencia_suplidor;
+              });
+              console.log(`Producto ${productoLocal.f_referencia} actualizado.`);
+            }
+          } else {
+            // Si el producto no existe, créalo con todos los campos
+            await productosCollection.create(record => {
+              record.f_referencia = parseInt(prod.f_referencia, 10);
               record.f_referencia_suplidor = prod.f_referencia_suplidor;
+              record.f_descripcion = prod.f_descripcion;
+              record.f_precio5 = parseFloat(prod.f_precio5);
+              record.f_existencia = parseFloat(prod.f_existencia);
             });
-            console.log(`Producto ${productoLocal.f_referencia} actualizado. Cambios: ${differences.join(', ')}`);
+            console.log(`Producto ${prod.f_referencia} insertado.`);
           }
 
-          //comparar existencia local con existencia remota
-          // console.log('Comparación - Existencia local:', existenciaLocal, 'Existencia remota:', existenciaRemota);
-          // Verifica si alguno de los campos es diferente
-          if (
-            Math.abs(existenciaLocal - existenciaRemota) > 0.001 ||
-            productoLocal.f_descripcion !== prod.f_descripcion ||
-            Math.abs(roundToTwo(productoLocal.f_precio5) - precioRemoto) > 0.001 ||
-            productoLocal.f_referencia !== referenciaRemota ||
-            productoLocal.f_referencia_suplidor !== prod.f_referencia_suplidor
-          ) {
-            await productoLocal.update(record => {
-              record.f_existencia = existenciaRemota;
-              record.f_descripcion = prod.f_descripcion;
-              record.f_precio5 = precioRemoto;
-              record.f_referencia = referenciaRemota;
-              record.f_referencia_suplidor = prod.f_referencia_suplidor;
-            });
-            console.log(`Producto ${productoLocal.f_referencia} actualizado.`);
-          }
-        } else {
-          // Si el producto no existe, créalo con todos los campos
-          await productosCollection.create(record => {
-            record.f_referencia = parseInt(prod.f_referencia, 10);
-            record.f_referencia_suplidor = prod.f_referencia_suplidor;
-            record.f_descripcion = prod.f_descripcion;
-            record.f_precio5 = parseFloat(prod.f_precio5);
-            record.f_existencia = parseFloat(prod.f_existencia);
-          });
-          console.log(`Producto ${prod.f_referencia} insertado.`);
         }
+      });
 
+      // Si lo deseas, actualiza el estado con los productos remotos o recarga los locales
+      setProductos(productosRemotos);
+    } catch (error) {
+      console.error('Error en la sincronización de productos:', error);
+    }
+    finally {
+      syncInProgress = false;
+    }
+  };
+
+
+
+  // Función para cargar productos desde la base de datos local
+  const cargarProductosLocales = async () => {
+    try {
+      const productosLocales = await database.collections
+        .get('t_productos_sucursal')
+        .query()
+        .fetch();
+      // Si es necesario, transforma los registros de WatermelonDB a objetos JS planos
+      setProductos(productosLocales);
+    } catch (error) {
+      console.error('Error al cargar productos locales:', error);
+    }
+  };
+
+  const cargarClientesLocales = async () => {
+    try {
+      const clientesLocales = await database.collections.get('t_clientes').query().fetch();
+      setClientes(clientesLocales);
+    } catch (error) {
+      console.error('Error al cargar clientes locales:', error);
+    }
+
+  }
+
+  // Función que decide si sincronizar o cargar localmente según la conexión
+  const cargarProductos = async () => {
+    // Primero carga los productos locales para una respuesta inmediata
+    await cargarProductosLocales();
+
+    // Luego verifica si hay conexión a internet
+    const netState = await NetInfo.fetch();
+    if (netState.isConnected) {
+      try {
+        // Sincroniza con la API para actualizar los productos
+        await sincronizarProductos();
+      } catch (error) {
+        console.error("Error al sincronizar, se mantienen los productos locales:", error);
+      }
+    }
+  };
+
+  useEffect(() => {
+    // Configura el intervalo para revisar y sincronizar cada 5 minutos
+    const intervalId = setInterval(() => {
+      if (syncInProgress) {
+        return;
+      }
+      cargarProductos();
+    }, 40000); // 90,000 ms = 90 segundos
+
+    // Limpia el intervalo cuando el componente se desmonte
+    return () => clearInterval(intervalId);
+  }, []);
+
+  useEffect(() => {
+    // Cargar clientes locales de inmediato
+    cargarClientesLocales();
+
+    // Verificar la conexión y sincronizar si es posible
+    NetInfo.fetch().then(netState => {
+      if (netState.isConnected) {
+        sincronizarClientes();
       }
     });
-
-    // Si lo deseas, actualiza el estado con los productos remotos o recarga los locales
-    setProductos(productosRemotos);
-  } catch (error) {
-    console.error('Error en la sincronización de productos:', error);
-  }
-  finally {
-    syncInProgress = false;
-  }
-};
+  }, []);
 
 
+  // Al seleccionar un cliente, carga los productos (sincronizando o desde la base local)
+  useEffect(() => {
+    if (clienteSeleccionado) {
+      setLoading(true);
+      cargarProductos().finally(() => setLoading(false));
+    }
+  }, [clienteSeleccionado]);
 
-// Función para cargar productos desde la base de datos local
-const cargarProductosLocales = async () => {
-  try {
-    const productosLocales = await database.collections
-      .get('t_productos_sucursal')
-      .query()
-      .fetch();
-    // Si es necesario, transforma los registros de WatermelonDB a objetos JS planos
-    setProductos(productosLocales);
-  } catch (error) {
-    console.error('Error al cargar productos locales:', error);
-  }
-};
-
-const cargarClientesLocales = async () =>{
-  try {
-    const clientesLocales = await database.collections.get('t_clientes').query().fetch();
-    setClientes(clientesLocales);
-  } catch (error) {
-    console.error('Error al cargar clientes locales:', error);
-  }
   
-}
-
-// Función que decide si sincronizar o cargar localmente según la conexión
-const cargarProductos = async () => {
-  // Primero carga los productos locales para una respuesta inmediata
-  await cargarProductosLocales();
-
-  // Luego verifica si hay conexión a internet
-  const netState = await NetInfo.fetch();
-  if (netState.isConnected) {
-    try {
-      // Sincroniza con la API para actualizar los productos
-      await sincronizarProductos();
-    } catch (error) {
-      console.error("Error al sincronizar, se mantienen los productos locales:", error);
+  useEffect(() => {
+    if (clienteSeleccionado && clienteSeleccionado.f_termino !== undefined) {
+      const defaultCondicion = condicionPedido.find(
+        item => item.id === clienteSeleccionado.f_termino
+      );
+      if (defaultCondicion) {
+        setCondicionSeleccionada(defaultCondicion);
+      }
     }
+  }, [clienteSeleccionado]);
+
+  if (loading) {
+    return <ActivityIndicator size="large" color="#0000ff" style={styles.loader} />;
   }
-};
 
-useEffect(() => {
-  // Configura el intervalo para revisar y sincronizar cada 5 minutos
-  const intervalId = setInterval(() => {
-    if (syncInProgress) {
-      return;
-    }
-    cargarProductos();
-  }, 40000); // 90,000 ms = 90 segundos
+  // Selección de cliente si aún no se ha seleccionado
+  if (!clienteSeleccionado) {
+    const clientesFiltrados = clientes.filter(cliente =>
+      (cliente.f_nombre.toLowerCase().includes(searchTextClientes.toLowerCase())) ||
+      (cliente.f_id ? cliente.f_id.toString().toLowerCase() : '').includes(searchTextClientes.toLowerCase())
+    );
 
-  // Limpia el intervalo cuando el componente se desmonte
-  return () => clearInterval(intervalId);
-}, []);
-
-useEffect(() => {
-  // Cargar clientes locales de inmediato
-  cargarClientesLocales();
-
-  // Verificar la conexión y sincronizar si es posible
-  NetInfo.fetch().then(netState => {
-    if (netState.isConnected) {
-      sincronizarClientes();
-    }
-  });
-}, []);
-
-
-
-// Al seleccionar un cliente, carga los productos (sincronizando o desde la base local)
-useEffect(() => {
-  if (clienteSeleccionado) {
-    setLoading(true);
-    cargarProductos().finally(() => setLoading(false));
-  }
-}, [clienteSeleccionado]);
-
-if (loading) {
-  return <ActivityIndicator size="large" color="#0000ff" style={styles.loader} />;
-}
-
-// Selección de cliente si aún no se ha seleccionado
-if (!clienteSeleccionado) {
-  const clientesFiltrados = clientes.filter(cliente =>
-    cliente.f_nombre.toLowerCase().includes(searchTextClientes.toLowerCase())
-  );
-
-  return (
-    <View style={styles.container}>
-      <Text style={styles.title}>Selecciona un Cliente</Text>
-      <Pressable title='cargar Clientes' onPress={fetchClientes}></Pressable>
-      <TextInput
-        style={styles.input}
-        placeholder="Buscar cliente..."
-        value={searchTextClientes}
-        onChangeText={setSearchTextClientes}
-      />
-      {/* Listado de clientes filtrados */}
-      <View style={styles.listContainer2}>
-        <KeyboardAwareFlatList
-          data={clientesFiltrados}
-          keyExtractor={item => item.f_id.toString()}
-          renderItem={({ item }) => (
-            <View style={styles.item}>
-              <View style={styles.textContainer}>
-                <TouchableOpacity onPress={() => setClienteSeleccionado(item)}>
-                  <Text style={styles.itemText}>({item.f_id}) {item.f_nombre}</Text>
-                </TouchableOpacity>
-              </View>
-            </View>
-          )}
-          ListEmptyComponent={<Text>No se encontraron clientes</Text>}
+    return (
+      <View style={styles.container}>
+        <Text style={styles.title}>Selecciona un Cliente</Text>
+        <Pressable title='cargar Clientes' onPress={fetchClientes}></Pressable>
+        <TextInput
+          style={styles.input}
+          placeholder="Buscar cliente..."
+          value={searchTextClientes}
+          onChangeText={setSearchTextClientes}
         />
+        {/* Listado de clientes filtrados */}
+        <View style={styles.listContainer2}>
+          <KeyboardAwareFlatList
+            data={clientesFiltrados}
+            keyExtractor={item => item.f_id.toString()}
+            renderItem={({ item }) => (
+              <View style={styles.item}>
+                <View >
+                  <TouchableOpacity onPress={() => setClienteSeleccionado(item)}>
+                    <Text style={styles.itemText}>({item.f_id}) {item.f_nombre}</Text>
+                    <Text style={styles.itemText}>Municipio: {item.f_d_municipio}</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            )}
+            ListEmptyComponent={<Text>No se encontraron clientes</Text>}
+          />
+        </View>
       </View>
-    </View>
+    );
+  }
+
+  // Filtrar productos según búsqueda
+  const productosFiltrados = productos.filter(producto =>
+    (producto.f_descripcion || '').toLowerCase().includes(searchTextProductos.toLowerCase()) ||
+    (producto.f_referencia ? producto.f_referencia.toString().toLowerCase() : '').includes(searchTextProductos.toLowerCase())
   );
-}
-
-// Filtrar productos según búsqueda
-const productosFiltrados = productos.filter(producto =>
-  (producto.f_descripcion || '').toLowerCase().includes(searchTextProductos.toLowerCase()) ||
-  (producto.f_referencia ? producto.f_referencia.toString().toLowerCase() : '').includes(searchTextProductos.toLowerCase())
-);
 
 
 
-// Funciones para actualizar pedido y eliminar productos (se mantienen igual)
-const actualizarCantidad = (f_referencia, cantidad, producto) => {
-  if (cantidad === '') {
+  // Funciones para actualizar pedido y eliminar productos (se mantienen igual)
+  const actualizarCantidad = (f_referencia, cantidad, producto) => {
+    if (cantidad === '') {
+      setPedido(prevPedido => {
+        const nuevoPedido = { ...prevPedido };
+        delete nuevoPedido[f_referencia];
+        return nuevoPedido;
+      });
+    } else {
+      const cantidadNumerica = parseInt(cantidad, 10) || 0;
+      setPedido(prevPedido => ({
+        ...prevPedido,
+        [f_referencia]: prevPedido[f_referencia]
+          ? { ...prevPedido[f_referencia], cantidad: cantidadNumerica }
+          : { f_referencia: producto.f_referencia, f_precio5: producto.f_precio5, cantidad: cantidadNumerica, f_referencia_suplidor: producto.f_referencia_suplidor, f_descripcion: producto.f_descripcion, f_existencia: producto.f_existencia }
+      }));
+    }
+  };
+
+
+  const eliminarDelPedido = (f_referencia) => {
     setPedido(prevPedido => {
       const nuevoPedido = { ...prevPedido };
       delete nuevoPedido[f_referencia];
       return nuevoPedido;
     });
-  } else {
-    const cantidadNumerica = parseInt(cantidad, 10) || 0;
-    setPedido(prevPedido => ({
-      ...prevPedido,
-      [f_referencia]: prevPedido[f_referencia]
-        ? { ...prevPedido[f_referencia], cantidad: cantidadNumerica }
-        : { f_referencia: producto.f_referencia, f_precio5: producto.f_precio5, cantidad: cantidadNumerica, f_referencia_suplidor: producto.f_referencia_suplidor, f_descripcion: producto.f_descripcion, f_existencia: producto.f_existencia }
+  };
+
+  //funcion del modal cambiar cantidad adel resumen del pedido
+  const cambiarCantidad = (f_referencia) => {
+    const producto = pedido[f_referencia];
+    if (!producto) {
+      Alert.alert("Producto no encontrado", "El producto seleccionado no existe en el pedido.");
+      return;
+    }
+    setProductoParaEditar({ ...producto, f_referencia });
+    setNuevaCantidad(producto.cantidad.toString());
+    setModalEditVisible(true);
+  };
+
+  const realizarPedidoLocal = async () => {
+    if (isSaving) return;
+    setIsSaving(true);
+    // Convertir el objeto 'pedido' en un array de detalles
+    const productosPedido = Object.entries(pedido).map(([f_referencia, data]) => ({
+      f_referencia: parseInt(f_referencia, 10),
+      cantidad: data.cantidad,
+      f_precio: data.f_precio5,
     }));
-  }
-};
 
+    if (productosPedido.length === 0) {
+      Alert.alert("Error", "No has seleccionado ningún producto");
+      return;
+    }
 
-const eliminarDelPedido = (f_referencia) => {
-  setPedido(prevPedido => {
-    const nuevoPedido = { ...prevPedido };
-    delete nuevoPedido[f_referencia];
-    return nuevoPedido;
-  });
-};
+    try {
+      await database.write(async () => {
+        // Obtener las colecciones correspondientes
+        const facturaCollection = database.collections.get('t_factura_pedido');
+        const detalleCollection = database.collections.get('t_detalle_factura_pedido');
 
-//funcion del modal cambiar cantidad adel resumen del pedido
-const cambiarCantidad = (f_referencia) => {
-  const producto = pedido[f_referencia];
-  if (!producto) {
-    Alert.alert("Producto no encontrado", "El producto seleccionado no existe en el pedido.");
-    return;
-  }
-  setProductoParaEditar({ ...producto, f_referencia });
-  setNuevaCantidad(producto.cantidad.toString());
-  setModalEditVisible(true);
-};
+        // Generar un identificador único para el documento del pedido
+        const documento = `PEDO-${Date.now()}`;
 
-const realizarPedidoLocal = async () => {
-  if(isSaving) return;
-  setIsSaving(true);
-  // Convertir el objeto 'pedido' en un array de detalles
-  const productosPedido = Object.entries(pedido).map(([f_referencia, data]) => ({
-    f_referencia: parseInt(f_referencia, 10),
-    cantidad: data.cantidad,
-    f_precio: data.f_precio5,
-  }));
+        // Insertar el encabezado (factura del pedido)
+        await facturaCollection.create(record => {
+          record.f_cliente = clienteSeleccionado.f_id;
+          record.f_documento = documento;
+          record.f_tipodoc = 'PEDO';
+          record.f_nodoc = 1; // Ajusta según tu lógica
+          record.f_fecha = new Date().toISOString();
+          record.f_itbis = itbis; // Calculado previamente
+          record.f_descuento = 0;
+          record.f_porc_descuento = 0;
+          record.f_monto = totalNeto; // Total neto del pedido
+          record.f_condicion = 1; // Por ejemplo, 1 para contado
+        });
 
-  if (productosPedido.length === 0) {
-    Alert.alert("Error", "No has seleccionado ningún producto");
-    return;
-  }
-
-  try {
-    await database.write(async () => {
-      // Obtener las colecciones correspondientes
-      const facturaCollection = database.collections.get('t_factura_pedido');
-      const detalleCollection = database.collections.get('t_detalle_factura_pedido');
-
-      // Generar un identificador único para el documento del pedido
-      const documento = `PEDO-${Date.now()}`;
-
-      // Insertar el encabezado (factura del pedido)
-      await facturaCollection.create(record => {
-        record.f_cliente = clienteSeleccionado.f_id;
-        record.f_documento = documento;
-        record.f_tipodoc = 'PEDO';
-        record.f_nodoc = 1; // Ajusta según tu lógica
-        record.f_fecha = new Date().toISOString();
-        record.f_itbis = itbis; // Calculado previamente
-        record.f_descuento = 0;
-        record.f_porc_descuento = 0;
-        record.f_monto = totalNeto; // Total neto del pedido
-        record.f_condicion = 1; // Por ejemplo, 1 para contado
+        // Insertar cada detalle del pedido
+        for (const item of productosPedido) {
+          await detalleCollection.create(record => {
+            record.f_documento = documento; // Relaciona el detalle con el encabezado
+            record.f_referencia = item.f_referencia;
+            record.f_cantidad = item.cantidad;
+            record.f_precio = item.f_precio;
+          });
+        }
       });
 
-      // Insertar cada detalle del pedido
-      for (const item of productosPedido) {
-        await detalleCollection.create(record => {
-          record.f_documento = documento; // Relaciona el detalle con el encabezado
-          record.f_referencia = item.f_referencia;
-          record.f_cantidad = item.cantidad;
-          record.f_precio = item.f_precio;
-        });
-      }
-    });
-
-    Alert.alert("Éxito", "Pedido guardado localmente");
-    setPedido({});
-    setModalVisible(false);
-  } catch (error) {
-    console.error("Error al guardar el pedido localmente:", error);
-    Alert.alert("Error", "No se pudo guardar el pedido localmente");
-  }
-  finally {
-    setIsSaving(false);
-  }
-};
+      Alert.alert("Éxito", "Pedido guardado localmente");
+      setPedido({});
+      setModalVisible(false);
+    } catch (error) {
+      console.error("Error al guardar el pedido localmente:", error);
+      Alert.alert("Error", "No se pudo guardar el pedido localmente");
+    }
+    finally {
+      setIsSaving(false);
+    }
+  };
 
 
-const totalBruto = Object.values(pedido).reduce((total, item) => (total + item.f_precio5 * item.cantidad), 0);
-const itbis = Number(totalBruto) * 0.18;
-const totalNeto = Number(totalBruto) + Number(itbis);
-const creditoDisponible = clienteSeleccionado.f_limite_credito - balanceCliente - totalNeto;
+  const totalBruto = Object.values(pedido).reduce((total, item) => (total + item.f_precio5 * item.cantidad), 0)
 
-return (
 
-  <SafeAreaView style={styles.container}>
-    <View>
-      <Text style={styles.title}>Cliente: ({clienteSeleccionado.f_id}) {clienteSeleccionado.f_nombre}</Text>
-      <View style={styles.headerContainer}>
-        <View style={{ flex: 2 }}>
-          <Text style={styles.headerText}>Limite de credito: ${clienteSeleccionado.f_limite_credito}</Text>
-          <Text style={styles.headerText}>Balance: ${balanceCliente}</Text>
-          <Text style={styles.headerText}>Disponible: ${creditoDisponible.toFixed(2)}</Text>
-          <Text style={styles.title}>Total del pedido: ${totalNeto.toFixed(2)}</Text>
+
+  const descuento = () => {
+    if (clienteSeleccionado && condicionSeleccionada) {
+      return condicionSeleccionada.id === 0
+        ? clienteSeleccionado.f_descuento_maximo / 100
+        : clienteSeleccionado.f_descuento1 / 100;
+    }
+    return 0; // En caso de que clienteSeleccionado o condicionSeleccionada sean null
+  };
+
+
+  const descuentoAplicado = descuento() * totalBruto;
+  const itbis = Number(totalBruto - descuentoAplicado) * 0.18;
+  const totalNeto = Number(totalBruto) + Number(itbis) - Number(descuentoAplicado);
+  const creditoDisponible = clienteSeleccionado.f_limite_credito - balanceCliente - totalNeto;
+
+
+  const condicionPedido = [
+    { id: 0, nombre: 'Contado' },
+    { id: 1, nombre: 'Crédito' },
+    { id: 2, nombre: 'Contra entrega' },
+    { id: 3, nombre: 'Vuelta viaje' },
+  ];
+
+  const condicionPedidoElegida = (option) => {
+    // Aquí puedes usar tanto el id como el name de la opción seleccionada
+    console.log("Seleccionaste:", option.id, option.nombre);
+    setCondicionSeleccionada(option);
+    setModalVisibleCondicion(false);
+  };
+
+
+
+  return (
+
+    <SafeAreaView style={styles.container}>
+      <View>
+        <ModalOptions
+          modalVisibleCondicion={modalVisibleCondicion}
+          setModalVisibleCondicion={setModalVisibleCondicion}
+          condicionPedido={condicionPedido}
+          condicionPedidoElegida={condicionPedidoElegida}
+        />
+      </View>
+
+      <View>
+        <View style={{ flexDirection: 'row', borderWidth: 1 }}>
+          <View style={{ flex: 4, borderWidth: 1, borderColor: 'red' }}>
+            <Text style={styles.title}>Cliente: ({clienteSeleccionado.f_id}) {clienteSeleccionado.f_nombre}</Text>
+          </View>
+          <View style={{ borderWidth: 1, borderColor: 'blue', flex: 1 }} >
+            <Pressable onPress={() => setClienteSeleccionado(null)} style={[styles.button, { flex: 1, marginBottom: 10 }]}>
+              <Text style={[styles.buttonText, { flex: 1 }]}>✍️</Text>
+            </Pressable>
+
+          </View>
         </View>
-        <View style={{ flex: 1 }}>
-          <Pressable onPress={() => setClienteSeleccionado(null)} style={styles.button}>
-            <Text style={styles.buttonText}>Cambiar Cliente</Text>
-          </Pressable>
-          <Pressable onPress={cargarProductosLocales} style={styles.button}>
+        <Text>
+          Condición seleccionada:{" "}
+          {condicionSeleccionada ? condicionSeleccionada.nombre : "Ninguna"}
+        </Text>
+        <Pressable title="Mostrar opciones" onPress={() => setModalVisibleCondicion(true)} style={[styles.button]}>
+          <Text style={styles.buttonText}>condicion✍️</Text>
+        </Pressable>
+        <View style={styles.headerContainer}>
+          <View style={{ flex: 2 }}>
+            <Text style={styles.headerText}>Limite de credito: {formatear(clienteSeleccionado.f_limite_credito)}</Text>
+            <Text style={styles.headerText}>Balance: {formatear(balanceCliente)}</Text>
+            <Text style={styles.headerText}>Disponible: {formatear(creditoDisponible)}</Text>
+            <Text style={styles.headerText}>Descuento: {(clienteSeleccionado.f_descuento1)} Descuento Global: {descuento}</Text>
+            <Text style={styles.title}>Total del pedido: {formatear(totalNeto)}</Text>
+          </View>
+          <View style={{ flex: 1 }}>
+
+
+            {/*<Pressable onPress={cargarProductosLocales} style={styles.button}>
             <Text style={styles.buttonText}>Cargar productos localess</Text>
-          </Pressable>
+          </Pressable>*/}
+
+            <TextInput>
+
+            </TextInput>
+
+
+          </View>
         </View>
       </View>
-    </View>
-    <View style={{ alignItems: 'center' }}>
-      <TextInput
-        style={styles.input}
-        placeholder="Buscar por nombre o referencia"
-        value={searchTextProductos}
-        onChangeText={setSearchTextProductos}
-      />
-    </View>
+      <View style={{ alignItems: 'center' }}>
+        <TextInput
+          style={styles.input}
+          placeholder="Buscar por nombre o referencia"
+          value={searchTextProductos}
+          onChangeText={setSearchTextProductos}
+        />
+      </View>
 
 
-    {/* Listado de productos hacer*/}
-    <View style={styles.listContainer2}>
-      <KeyboardAwareFlatList
-        data={productosFiltrados}
-        keyExtractor={(item) => (item.f_referencia ? item.f_referencia.toString() : item.f_referencia.toString())}
-        keyboardShouldPersistTaps="always"
-        extraScrollHeight={20}
-        renderItem={({ item }) => (
-          <View style={styles.listContainer}>
-            <View style={{ flex: 1 }}>
-              <Text style={styles.itemText}>
-                ({item.f_referencia}) - {item.f_referencia_suplidor}
-              </Text>
-              <Text style={styles.itemText}>{item.f_descripcion}</Text>
-              <Text style={styles.itemText}>${item.f_precio5}</Text>
-              <Text style={styles.itemText}>Existencia: {item.f_existencia}</Text>
-            </View>
-            <TextInput
-              style={styles.inputP}
-              placeholder="QTY"
-              keyboardType="numeric"
-              value={pedido[item.f_referencia]?.cantidad?.toString() || ''}
-              onChangeText={(cantidad) => actualizarCantidad(item.f_referencia, cantidad, item)}
-            />
-          </View>
-
-        )}
-        ListEmptyComponent={<Text>No se encontraron productos</Text>}
-      />
-    </View>
-    <View style={styles.buttonContainer}>
-      <Pressable onPress={() => setModalVisible(true)} style={styles.buttonB}>
-        <Text style={styles.buttonText}>VER PEDIDO</Text>
-      </Pressable>
-    </View>
-
-    <Modal
-      animationType="slide"
-      transparent={false}
-      visible={modalVisible}
-      onRequestClose={() => setModalVisible(false)}
-    >
-      <SafeAreaView style={{ flex: 1 }}>
-        <View style={{ flex: 1, padding: 10 }}>
-          {/* Sección no scrollable: encabezado */}
-          <View>
-            <Text style={styles.title}>🛒 Resumen del Pedido</Text>
-            <Text style={styles.title}>
-              Cliente: ({clienteSeleccionado.f_id}) {clienteSeleccionado.f_nombre}
-            </Text>
-            <Text>Crédito Disponible: ${creditoDisponible.toFixed(2)}</Text>
-            <View style={styles.modalHeader}>
-              <Text>Total bruto: ${totalBruto.toFixed(2)}</Text>
-              <Text>ITBIS: ${itbis.toFixed(2)}</Text>
-              <Text style={styles.title}>
-                Total del pedido: ${totalNeto.toFixed(2)}
-              </Text>
-            </View>
-            <Text style={styles.title}>Detalle del pedido:</Text>
-          </View>
-
-          {/* Área scrollable: lista de productos */}
-          <View style={{ flex: 1 }}>
-            {Object.keys(pedido).length > 0 ? (
-              <KeyboardAwareFlatList
-                data={Object.entries(pedido)}
-                keyExtractor={([f_referencia]) => f_referencia}
-                contentContainerStyle={{ paddingBottom: 20 }}
-                renderItem={({ item: [f_referencia, data] }) => (
-                  <View style={styles.listContainer}>
-                    <View style={{ flex: 1 }}>
-                      <Text>
-                        ({data.f_referencia}) - {data.f_referencia_suplidor}
-                      </Text>
-                      <Text>{data.f_descripcion}</Text>
-                      <Text>Cantidad: {data.cantidad}</Text>
-                      <Text>
-                        Precio: ${data.f_precio5} Total: $
-                        {(data.f_precio5 * data.cantidad).toFixed(2)}
-                      </Text>
-                    </View>
-                    <View>
-                      <TouchableOpacity onPress={() => cambiarCantidad(f_referencia)} style={styles.modalButton2}>
-                        <Text style={[styles.modalButtonText, isSaving && { opacity: 0.6 }]}
-                          disabled={isSaving}>✍️</Text>
-                      </TouchableOpacity>
-                      <TouchableOpacity onPress={() => eliminarDelPedido(f_referencia)} style={[styles.modalButton3, isSaving && { opacity: 0.6 }]}
-                        disabled={isSaving}>
-                        <Text style={styles.modalButtonText}>❌</Text>
-                      </TouchableOpacity>
-                    </View>
-                  </View>
-                )}
+      {/* Listado de productos hacer pedido*/}
+      <View style={styles.listContainer2}>
+        <KeyboardAwareFlatList
+          data={productosFiltrados}
+          keyExtractor={(item) => (item.f_referencia ? item.f_referencia.toString() : item.f_referencia.toString())}
+          keyboardShouldPersistTaps="always"
+          extraScrollHeight={20}
+          renderItem={({ item }) => (
+            <View style={styles.listContainer}>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.itemText}>
+                  ({item.f_referencia}) - {item.f_referencia_suplidor}
+                </Text>
+                <Text style={styles.itemText}>{item.f_descripcion}</Text>
+                <Text style={styles.itemText}>${item.f_precio5}</Text>
+                <Text style={styles.itemText}>Existencia: {item.f_existencia}</Text>
+              </View>
+              <TextInput
+                style={styles.inputP}
+                placeholder="QTY"
+                keyboardType="numeric"
+                value={pedido[item.f_referencia]?.cantidad?.toString() || ''}
+                onChangeText={(cantidad) => actualizarCantidad(item.f_referencia, cantidad, item)}
               />
-            ) : (
-              <Text>No hay productos en el pedido</Text>
-            )}
-          </View>
-        </View>
+            </View>
 
-        {/* Contenedor fijo de botones */}
-        <View style={{ height: 60, flexDirection: 'row', justifyContent: 'space-between', padding: 10 }}>
-          <Pressable onPress={() => setModalVisible(false)} style={[styles.buttonRow2, isSaving && { opacity: 0.6 }]}
-            disabled={isSaving}>
-            <Text style={styles.buttonText}>Agregar productos</Text>
-          </Pressable>
-          <Pressable 
-              onPress={realizarPedidoLocal} 
-              style={[styles.buttonRow, isSaving && { opacity: 0.6 }]} 
+          )}
+          ListEmptyComponent={<Text>No se encontraron productos</Text>}
+        />
+      </View>
+      <View style={styles.buttonContainer}>
+        <Pressable onPress={() => setModalVisible(true)} style={styles.buttonB}>
+          <Text style={styles.buttonText}>VER PEDIDO</Text>
+        </Pressable>
+      </View>
+
+      <Modal
+        animationType="slide"
+        transparent={false}
+        visible={modalVisible}
+        onRequestClose={() => setModalVisible(false)}
+      >
+        <SafeAreaView style={{ flex: 1 }}>
+          <View style={{ flex: 1, padding: 10 }}>
+            {/* Sección no scrollable: encabezado */}
+            <View>
+              <Text style={styles.title}>🛒 Resumen del Pedido</Text>
+              <Text style={styles.title}>
+                Cliente: ({clienteSeleccionado.f_id}) {clienteSeleccionado.f_nombre}
+              </Text>
+              <Text>Crédito Disponible: {formatear(creditoDisponible)}</Text>
+              <View style={styles.modalHeader}>
+                <Text>Total bruto: {formatear(totalBruto)}</Text>
+                <Text>Descuento: {formatear(totalBruto * descuento)}</Text>
+                <Text>ITBIS: {formatear(itbis)}</Text>
+                <Text style={styles.title}>
+                  Total del pedido: {formatear(totalNeto)}
+                </Text>
+              </View>
+              <Text style={styles.title}>Detalle del pedido:</Text>
+            </View>
+
+            {/* Área scrollable: lista de productos */}
+            <View style={{ flex: 1 }}>
+              {Object.keys(pedido).length > 0 ? (
+                <KeyboardAwareFlatList
+                  data={Object.entries(pedido)}
+                  keyExtractor={([f_referencia]) => f_referencia}
+                  contentContainerStyle={{ paddingBottom: 20 }}
+                  renderItem={({ item: [f_referencia, data] }) => (
+                    <View style={styles.listContainer}>
+                      <View style={{ flex: 1 }}>
+                        <Text>
+                          ({data.f_referencia}) - {data.f_referencia_suplidor}
+                        </Text>
+                        <Text>{data.f_descripcion}</Text>
+                        <Text>Cantidad: {data.cantidad}</Text>
+                        <Text>
+                          Precio: ${data.f_precio5} Total:
+                          {formatear(data.f_precio5 * data.cantidad)}
+                        </Text>
+                      </View>
+                      <View>
+                        <TouchableOpacity onPress={() => cambiarCantidad(f_referencia)} style={styles.modalButton2}>
+                          <Text style={[styles.modalButtonText, isSaving && { opacity: 0.6 }]}
+                            disabled={isSaving}>✍️</Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity onPress={() => eliminarDelPedido(f_referencia)} style={[styles.modalButton3, isSaving && { opacity: 0.6 }]}
+                          disabled={isSaving}>
+                          <Text style={styles.modalButtonText}>❌</Text>
+                        </TouchableOpacity>
+                      </View>
+                    </View>
+                  )}
+                />
+              ) : (
+                <Text>No hay productos en el pedido</Text>
+              )}
+            </View>
+          </View>
+
+          {/* Contenedor fijo de botones */}
+          <View style={{ height: 60, flexDirection: 'row', justifyContent: 'space-between', padding: 10 }}>
+            <Pressable onPress={() => setModalVisible(false)} style={[styles.buttonRow2, isSaving && { opacity: 0.6 }]}
+              disabled={isSaving}>
+              <Text style={styles.buttonText}>Agregar productos</Text>
+            </Pressable>
+            <Pressable
+              onPress={realizarPedidoLocal}
+              style={[styles.buttonRow, isSaving && { opacity: 0.6 }]}
               disabled={isSaving}
             >
               {isSaving ? (
@@ -707,24 +792,24 @@ return (
                 <Text style={styles.buttonText}>Confirmar Pedido</Text>
               )}
             </Pressable>
-        </View>
-      </SafeAreaView>
-    </Modal>
+          </View>
+        </SafeAreaView>
+      </Modal>
 
-    <CambiarCantidadModal
-      visible={modalEditVisible}
-      onCancel={() => setModalEditVisible(false)}
-      onAccept={() => {
-        actualizarCantidad(productoParaEditar.f_referencia, nuevaCantidad, productoParaEditar);
-        setModalEditVisible(false);
-      }}
-      producto={productoParaEditar}
-      nuevaCantidad={nuevaCantidad}
-      setNuevaCantidad={setNuevaCantidad}
-    />
+      <CambiarCantidadModal
+        visible={modalEditVisible}
+        onCancel={() => setModalEditVisible(false)}
+        onAccept={() => {
+          actualizarCantidad(productoParaEditar.f_referencia, nuevaCantidad, productoParaEditar);
+          setModalEditVisible(false);
+        }}
+        producto={productoParaEditar}
+        nuevaCantidad={nuevaCantidad}
+        setNuevaCantidad={setNuevaCantidad}
+      />
 
 
 
-  </SafeAreaView>
-);
+    </SafeAreaView>
+  );
 }

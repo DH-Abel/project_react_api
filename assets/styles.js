@@ -64,6 +64,8 @@ export const styles = StyleSheet.create({
         flex: 1,
         paddingTop: 10,
         padding: 5,
+        borderWidth: 1,
+        borderColor: 'red',
         backgroundColor: '#f4f4f4',
       },
       modalContainer: {
@@ -150,8 +152,6 @@ export const styles = StyleSheet.create({
 
     },
     button: {
-      width: 100,
-      height: 35,
       paddingHorizontal: 10,
       backgroundColor: "#007AFF",
       borderRadius: 5,
@@ -160,7 +160,6 @@ export const styles = StyleSheet.create({
       alignItems: 'center',
       justifyContent: 'center',
       marginLeft: 10,
-      marginBottom: 1,
     },
     buttonB: {
       width: 150,

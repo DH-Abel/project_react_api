@@ -31,6 +31,7 @@ export class Clientes extends Model {
   @field('f_facturar_contra_entrega') f_facturar_contra_entrega;
   @field('f_bloqueo_ck') f_bloqueo_ck;
   @field('f_limite_credito') f_limite_credito;
+  @field('f_termino') f_termino;
 }
 
 export class CuentaCobrar extends Model {

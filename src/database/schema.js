@@ -35,6 +35,7 @@ export const mySchema = appSchema({
         { name: 'f_facturar_contra_entrega', type: 'boolean' },
         { name: 'f_bloqueo_ck', type: 'boolean' },
         { name: 'f_limite_credito', type: 'number' },
+        { name: 'f_termino', type: 'number' },
       ],
     }),
     tableSchema({
