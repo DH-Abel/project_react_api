@@ -20,10 +20,9 @@ export class Clientes extends Model {
   @field('f_zona') f_zona;
   @text('f_telefono') f_telefono;
   @field('f_telefono_pro') f_telefono_pro;
-  @field('f_descuento') f_descuento;
+  @field('f_descuento_maximo') f_descuento_maximo;
   @field('f_descuento1') f_descuento1;
   @field('f_clasificacion') f_clasificacion;
-  @text('f_rnc') f_rnc;
   @text('f_direccion') f_direccion;
   @field('f_activo') f_activo;
   @text('f_cedula') f_cedula;

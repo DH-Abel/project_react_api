@@ -3,6 +3,7 @@ import { View, Text, FlatList, ActivityIndicator, SafeAreaView, Pressable, Modal
 import { database } from '../src/database/database';
 import { Q } from '@nozbe/watermelondb';
 import { formatear } from '../assets/formatear';
+import { styles } from '../assets/styles';
 
 export default function Pedidos({ navigation }) {
   const [pedidos, setPedidos] = useState([]);
@@ -113,7 +114,7 @@ export default function Pedidos({ navigation }) {
 
           return (
             
-            <View style={{ padding: 10, marginBottom: 10, backgroundColor: '#f0f0f0', borderRadius: 8 }}>
+            <View style={styles.listContainer2}>
             <Text style={{ fontSize: 18 }}>Documento: {item.f_documento}</Text>
             <Text style={{ fontSize: 16 }}>Cliente: ({item.f_cliente}) {cliente.f_nombre} </Text>
             {/*<Text style={{ fontSize: 16 }}>Tipo: {item.f_tipodoc}</Text>*/}
