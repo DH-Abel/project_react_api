@@ -580,9 +580,11 @@ export default function TestApi() {
 
   const descuento = () => {
     if (clienteSeleccionado && condicionSeleccionada) {
-      return condicionSeleccionada.id === 0 
-        ? clienteSeleccionado.f_descuento_maximo
-        : clienteSeleccionado.f_descuento1;
+      if (condicionSeleccionada.id === 0 || condicionSeleccionada.id === 2) {
+        return clienteSeleccionado.f_descuento_maximo
+      } else {
+        return clienteSeleccionado.f_descuento1;
+      }
     }
     return 0; // En caso de que clienteSeleccionado o condicionSeleccionada sean null
   };
@@ -624,12 +626,12 @@ export default function TestApi() {
 
       <View>
         <View style={{ flexDirection: 'row', borderWidth: 1 }}>
-          <View style={{ flex: 4, borderWidth: 1, borderColor: 'red' }}>
+          <View style={{ flex: 7, borderWidth: 1, borderColor: 'red' }}>
             <Text style={styles.title}>Cliente: ({clienteSeleccionado.f_id}) {clienteSeleccionado.f_nombre}</Text>
           </View>
           <View style={{ borderWidth: 1, borderColor: 'blue', flex: 1 }} >
             <Pressable onPress={() => setClienteSeleccionado(null)} style={[styles.button, { flex: 1, marginBottom: 10 }]}>
-              <Text style={[styles.buttonText, { flex: 1 }]}>✍️</Text>
+              <Text style={[styles.buttonText]}>✍️</Text>
             </Pressable>
 
           </View>
@@ -688,7 +690,7 @@ export default function TestApi() {
                   ({item.f_referencia}) - {item.f_referencia_suplidor}
                 </Text>
                 <Text style={styles.itemText}>{item.f_descripcion}</Text>
-                <Text style={styles.itemText}>${item.f_precio5}</Text>
+                <Text style={styles.itemText}>Precio:{formatear(item.f_precio5)}{'   '} Precio -desc: {descuentoGlobal}</Text>
                 <Text style={styles.itemText}>Existencia: {item.f_existencia}</Text>
               </View>
               <TextInput
